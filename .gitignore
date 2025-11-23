@@ -1,0 +1,13 @@
+__pycache__/
+.env
+device_auths.json
+.DS_Store
+node_modules/
+dist/
+.vscode/
+*.log
+*.sqlite
+*.sqlite-journal
+coverage/
+coverage-final.json
+reports/
