@@ -21,7 +21,7 @@ class FortniteBot(commands.Bot):
 
     async def setup_hook(self):
         await self.load_extension('cogs.fortnite')
-        print("✅ Fortnite Cog loaded.")
+        print("Fortnite Cog loaded.")
         
         try:
             if GUILD_ID:
@@ -33,7 +33,7 @@ class FortniteBot(commands.Bot):
                 await self.tree.sync()
                 print("🔁 Synced globally (May take 1 hour to update)")
         except Exception as e:
-            print(f"⚠️ Sync Error: {e}")
+            print(f"Sync Error: {e}")
 
     async def on_ready(self):
         print(f'🤖 Logged in as {self.user} (ID: {self.user.id})')
@@ -41,7 +41,7 @@ class FortniteBot(commands.Bot):
 
 async def main():
     if not DISCORD_TOKEN:
-        print("❌ Error: DISCORD_TOKEN not found in .env")
+        print("Error: DISCORD_TOKEN not found in .env")
         return
         
     bot = FortniteBot()

@@ -41,57 +41,54 @@ class Fortnite(commands.Cog):
                     if resp.status == 200:
                         self.fngg_cache = await resp.json()
                         self.fngg_cache_time = datetime.datetime.now()
-                        print("🔄 Refreshed FNGG Item Cache")
+                        print("Refreshed FNGG Item Cache")
             except Exception as e:
                 print(f"Failed to fetch FNGG cache: {e}")
         return self.fngg_cache
 
-    @commands.hybrid_command(name="vbucks", description="Check a player's V-Bucks and locker link")
+    async def _authenticate(self, session, device_auths):
+        token_url = "https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token"
+        token_payload = {
+            "grant_type": "device_auth",
+            "account_id": device_auths.get('account_id'),
+            "device_id": device_auths.get('device_id'),
+            "secret": device_auths.get('secret')
+        }
+        token_headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": f"Basic {AUTH_HEADER}"
+        }
+
+        async with session.post(token_url, data=token_payload, headers=token_headers) as resp:
+            if resp.status != 200:
+                return None, await resp.text()
+            return await resp.json(), None
+
+    @commands.hybrid_command(name="vbucks", description="Check V-Bucks balance")
     @app_commands.describe(name="The account name stored in device_auths.json")
-    async def check_vbucks(self, ctx, *, name):
+    async def vbucks(self, ctx, *, name: str = "ShrillKangaroo"):
         await ctx.defer()
-        
         status_msg = await ctx.send(f"🔄 Authenticating as **{name}**...")
-        
+
         device_auths, proper_name = self.get_auth_details(name)
         if not device_auths:
             await status_msg.edit(content=f"❌ Profile **{name}** not found in `device_auths.json`.")
             return
 
         async with aiohttp.ClientSession() as session:
-            token_url = "https://account-public-service-prod.ol.epicgames.com/account/api/oauth/token"
-            token_payload = {
-                "grant_type": "device_auth",
-                "account_id": device_auths.get('account_id'),
-                "device_id": device_auths.get('device_id'),
-                "secret": device_auths.get('secret')
-            }
-            token_headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Authorization": f"Basic {AUTH_HEADER}"
-            }
-
-            try:
-                async with session.post(token_url, data=token_payload, headers=token_headers) as resp:
-                    if resp.status != 200:
-                        await status_msg.edit(content=f"❌ Auth failed: HTTP {resp.status}")
-                        return
-                    token_data = await resp.json()
-            except Exception as e:
-                await status_msg.edit(content=f"❌ Connection error: {e}")
+            token_data, error = await self._authenticate(session, device_auths)
+            if error:
+                await status_msg.edit(content=f"❌ Auth failed: `{error}`")
                 return
 
             access_token = token_data['access_token']
             account_id = token_data['account_id']
             display_name = token_data.get('displayName', 'Unknown')
 
-            await status_msg.edit(content=f"✅ Logged in as **{display_name}**. Fetching profile...")
-
             api_headers = {"Content-Type": "application/json", "Authorization": f"Bearer {access_token}"}
 
             common_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client/QueryProfile?profileId=common_core&rvn=-1"
             total_vbucks = 0
-            banners = []
             
             async with session.post(common_url, json={}, headers=api_headers) as resp:
                 if resp.status == 200:
@@ -108,14 +105,57 @@ class Fortnite(commands.Cog):
                                         platform = attr.get('platform', 'Shared') if attr else 'Shared'
                                         if platform != "Nintendo":
                                             total_vbucks += quantity
-                                    if "HomebaseBannerIcon" in template_id:
-                                        banners.append(template_id.split(":")[1])
+                else:
+                    await status_msg.edit(content=f"❌ Failed to fetch profile: HTTP {resp.status}")
+                    return
 
-            athena_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client/QueryProfile?profileId=athena&rvn=-1"
+            embed = discord.Embed(title=f"💰 V-Bucks: {display_name}", color=discord.Color.green())
+            embed.description = f"## **{total_vbucks:,}** V-Bucks"
+            embed.set_footer(text=f"Account ID: {account_id}")
+            
+            await status_msg.edit(content=None, embed=embed)
+
+    @commands.hybrid_command(name="locker", description="Generate a Fortnite.GG locker link")
+    @app_commands.describe(name="The account name stored in device_auths.json")
+    async def locker(self, ctx, *, name: str = "ShrillKangaroo"):
+        await ctx.defer()
+        status_msg = await ctx.send(f"🔄 Generating Locker for **{name}**...")
+
+        device_auths, proper_name = self.get_auth_details(name)
+        if not device_auths:
+            await status_msg.edit(content=f"❌ Profile **{name}** not found in `device_auths.json`.")
+            return
+
+        async with aiohttp.ClientSession() as session:
+            token_data, error = await self._authenticate(session, device_auths)
+            if error:
+                await status_msg.edit(content=f"❌ Auth failed: `{error}`")
+                return
+
+            access_token = token_data['access_token']
+            account_id = token_data['account_id']
+            display_name = token_data.get('displayName', 'Unknown')
+
+            api_headers = {"Content-Type": "application/json", "Authorization": f"Bearer {access_token}"}
+
             owned_ids = []
             creation_date = ""
             locker_counts = {"AthenaCharacter": 0, "AthenaDance": 0, "AthenaPickaxe": 0, "AthenaGlider": 0}
 
+            common_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client/QueryProfile?profileId=common_core&rvn=-1"
+            async with session.post(common_url, json={}, headers=api_headers) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if 'profileChanges' in data:
+                        for change in data['profileChanges']:
+                            if 'profile' in change and 'items' in change['profile']:
+                                items = change['profile']['items']
+                                for item_data in items.values():
+                                    template_id = item_data.get('templateId', '')
+                                    if "HomebaseBannerIcon" in template_id:
+                                        owned_ids.append(template_id.split(":")[1].lower())
+
+            athena_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client/QueryProfile?profileId=athena&rvn=-1"
             async with session.post(athena_url, json={}, headers=api_headers) as resp:
                 if resp.status == 200:
                     athena_data = await resp.json()
@@ -132,10 +172,10 @@ class Fortnite(commands.Cog):
                                 owned_ids.append(i_id.lower())
                                 if i_type in locker_counts:
                                     locker_counts[i_type] += 1
-            
-            owned_ids.extend([b.lower() for b in banners])
+                else:
+                    await status_msg.edit(content=f"❌ Failed to fetch locker: HTTP {resp.status}")
+                    return
 
-            # 4. Generate FNGG Link
             fngg_map = await self.get_fngg_map(session)
             locker_link = None
             if fngg_map:
@@ -150,12 +190,10 @@ class Fortnite(commands.Cog):
                     compressed = compressor.compress(payload.encode()) + compressor.flush()
                     locker_link = f"https://fortnite.gg/my-locker?items={base64.urlsafe_b64encode(compressed).decode().rstrip('=')}"
 
-            embed = discord.Embed(title=f"Locker: {display_name}", color=discord.Color.blue())
-            embed.add_field(name="💰 V-Bucks", value=f"**{total_vbucks:,}**", inline=False)
-            stats_text = "\n".join([f"{k.replace('Athena', '')}: {v}" for k, v in locker_counts.items()])
-            embed.add_field(name="🎒 Inventory", value=stats_text, inline=True)
-            embed.set_footer(text=f"Account ID: {account_id}")
-
+            embed = discord.Embed(title=f"🎒 Locker: {display_name}", color=discord.Color.blue())
+            stats_text = "\n".join([f"**{v}** {k.replace('Athena', '')}" for k, v in locker_counts.items()])
+            embed.description = stats_text
+            
             view = discord.ui.View()
             if locker_link:
                 view.add_item(discord.ui.Button(label="View on Fortnite.GG", url=locker_link))
