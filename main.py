@@ -36,6 +36,7 @@ class FortniteBot(commands.Bot):
             print(f"Sync Error: {e}")
 
     async def on_ready(self):
+        await self.change_presence(activity=discord.Game(name="Fortnite"))
         print(f'🤖 Logged in as {self.user} (ID: {self.user.id})')
         print('------')
 

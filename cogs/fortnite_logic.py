@@ -11,6 +11,7 @@ import traceback
 
 CLIENT_ID = "3f69e56c7649492c8cc29f1af08a8a12"
 CLIENT_SECRET = "b51ee9cb12234f50a69efa67ef53812e"
+
 AUTH_HEADER = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
 class LoginModal(discord.ui.Modal, title="Link Epic Account"):
@@ -424,44 +425,24 @@ class Fortnite(commands.Cog):
             traceback.print_exc()
             await status_msg.edit(content=f"❌ Error: `{e}`")
 
-    @commands.hybrid_command(name="claimleave", description="Claim STW rewards")
-    @app_commands.describe(name="Account name (leave empty for first account)")
-    async def claimleave(self, ctx, *, name: str = None):
+    @commands.hybrid_command(name="taxi", description="Unlock STW Map (Twine Peaks)")
+    async def taxi(self, ctx, epic_name: str):
         await ctx.defer()
         
-        device_auths = self.get_auth_details(ctx.author.id, name)
-        if not device_auths:
-            await ctx.send("❌ Account not found.")
-            return
-
-        status_msg = await ctx.send(f"🔄 Authenticating as **{device_auths['account_name']}**...")
-
-        async with aiohttp.ClientSession() as session:
-            token_data, error = await self._authenticate(session, device_auths)
-            if error:
-                await status_msg.edit(content=f"❌ Auth failed: `{error}`")
-                return
-
-            access_token = token_data['access_token']
-            account_id = token_data['account_id']
-            display_name = token_data.get('displayName', 'Unknown')
-            api_headers = {"Content-Type": "application/json", "Authorization": f"Bearer {access_token}"}
-
-            await status_msg.edit(content=f"✅ Logged in. Claiming rewards...")
-
-            claim_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client/ClaimMissions?profileId=campaign&rvn=-1"
-            
-            try:
-                async with session.post(claim_url, json={}, headers=api_headers) as resp:
+        url = "http://127.0.0.1:8080/taxi"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json={"username": epic_name}) as resp:
+                    text = await resp.text()
                     if resp.status == 200:
-                        embed = discord.Embed(title=f"✅ Rewards Claimed: {display_name}", color=discord.Color.purple())
-                        embed.description = "Successfully triggered `ClaimMissions`."
-                        await status_msg.edit(content=None, embed=embed)
+                        embed = discord.Embed(title="🚖 Taxi Dispatch", description=text, color=discord.Color.gold())
+                        embed.add_field(name="Instructions", value="1. **Accept** the bot's join request (or invite).\n2. **Promote** the bot to Party Leader.\n3. Wait for it to say **'Map Unlocked'** and leave.")
+                        await ctx.send(embed=embed)
                     else:
-                        text = await resp.text()
-                        await status_msg.edit(content=f"❌ Claim failed: HTTP {resp.status}\n`{text}`")
-            except Exception as e:
-                 await status_msg.edit(content=f"❌ Error: {e}")
+                        await ctx.send(f"❌ Taxi Error: {text}")
+        except:
+            await ctx.send("❌ Taxi Service is OFFLINE. Please contact admin.")
 
 async def setup(bot):
     await bot.add_cog(Fortnite(bot))

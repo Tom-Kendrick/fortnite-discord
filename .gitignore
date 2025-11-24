@@ -6,9 +6,6 @@ node_modules/
 dist/
 .vscode/
 *.log
-*.sqlite
-*.sqlite-journal
-coverage/
-coverage-final.json
-reports/
 .ssh/
+update_instructions.txt
+.taxi_venv/
