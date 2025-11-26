@@ -9,3 +9,4 @@ dist/
 .ssh/
 update_instructions.txt
 .taxi_venv/
+test_files/

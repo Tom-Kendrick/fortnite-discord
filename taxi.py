@@ -141,6 +141,7 @@ async def start_server():
 @client.event
 async def event_ready():
     log.info(f"✅ Taxi Bot Online: {client.user.display_name}")
+    client.set_presence(state="Waiting for Something...")
     await start_server()
 
 @client.event
