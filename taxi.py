@@ -14,6 +14,7 @@ BOT_OWNER_ID = "977589162213507073"
 SKIN_ID = "CID_A_189_Athena_Commando_M_Lavish_HUU31"
 EMOTE_ID = "EID_IceCream"
 BOT_MODE = "BR"
+LEVEL_TO_SHOW = 150
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger("TaxiService")
@@ -80,10 +81,7 @@ async def update_party_metadata():
             }
         else:
             subgame = "BattleRoyale"
-            extra_meta = {
-                "Default:SeasonLevel_d": "1000",
-                "Default:BattlePassLevel_d": "1000"
-            }
+            extra_meta = {}
 
         metadata = {
             "Default:SubGame_s": subgame, 
@@ -193,6 +191,11 @@ async def event_party_member_join(member):
                 await asyncio.sleep(0.5)
                 await client.party.me.set_emote(asset=EMOTE_ID)
                 log.info("✅ Emote Triggered.")
+                await client.party.me.set_banner(
+                    icon="StandardBanner1", 
+                    color="DefaultColor1", 
+                    season_level=LEVEL_TO_SHOW
+                )
 
                 
             except Exception as e:
