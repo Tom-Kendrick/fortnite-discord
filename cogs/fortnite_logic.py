@@ -425,24 +425,34 @@ class Fortnite(commands.Cog):
             traceback.print_exc()
             await status_msg.edit(content=f"❌ Error: `{e}`")
 
-    @commands.hybrid_command(name="taxi", description="Unlock STW Map (Twine Peaks)")
-    async def taxi(self, ctx, epic_name: str):
+    @commands.hybrid_command(name="taxi", description="STW Taxi Service")
+    @app_commands.describe(epic_name="Epic Username")
+    async def taxi(self, ctx, epic_name: str = None):
         await ctx.defer()
-        
+        target_user = epic_name
+        if target_user is None:
+            account_data = self.get_auth_details(ctx.author.id)
+            
+            if not account_data:
+                await ctx.send("❌ No name provided and no linked account found. Please use `/login` or type a name.", ephemeral=True)
+                return
+            
+            target_user = account_data.get("account_name")
+
         url = "http://127.0.0.1:8080/taxi"
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, json={"username": epic_name}) as resp:
+                async with session.post(url, json={"username": target_user}) as resp:
                     text = await resp.text()
+                    
                     if resp.status == 200:
-                        embed = discord.Embed(title="🚖 Taxi Dispatch", description=text, color=discord.Color.gold())
-                        embed.add_field(name="Instructions", value="1. **Accept** the bot's join request (or invite).\n2. **Promote** the bot to Party Leader.\n3. Wait for it to say **'Map Unlocked'** and leave.")
+                        embed = discord.Embed(title="🚖 Taxi Dispatch", description=f"Joining **{target_user}**\n\n{text}", color=discord.Color.gold())
                         await ctx.send(embed=embed)
                     else:
                         await ctx.send(f"❌ Taxi Error: {text}")
-        except:
-            await ctx.send("❌ Taxi Service is OFFLINE. Please contact admin.")
+        except Exception as e:
+            await ctx.send(f"❌ Taxi Service is OFFLINE. (Error: {e})")
 
 async def setup(bot):
     await bot.add_cog(Fortnite(bot))
