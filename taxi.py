@@ -14,7 +14,7 @@ BOT_OWNER_ID = "977589162213507073"
 
 SKIN_ID = "CID_A_189_Athena_Commando_M_Lavish_HUU31"
 EMOTE_ID = ["EID_Wave", "EID_AmazingForever_Q68W0"]
-EMOTE_ID_IDLE = ["EID_SpongeHollow", "EID_IgniteEgg_Jab", "EID_MikeCheck", "EID_YouBoreMe", "EID_ChairTime", "EID_Texting", "EID_HighActivity", "EID_Facepalm"]
+EMOTE_ID_IDLE = ["EID_IgniteEgg_Jab", "EID_MikeCheck", "EID_YouBoreMe", "EID_ChairTime", "EID_Texting", "EID_HighActivity", "EID_Facepalm"]
 BOT_MODE = "STW"
 LEVEL_TO_SHOW = 420
 
@@ -159,13 +159,15 @@ async def start_server():
 
 async def idle_task():
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(120)
         if client.party:
             try:
                 await client.party.me.clear_emote()
-                await asyncio.sleep(0.5) 
+                await asyncio.sleep(0.5)
                 
                 await client.party.me.set_emote(asset=random.choice(EMOTE_ID_IDLE))
+                await asyncio.sleep(10)
+                await client.party.me.clear_emote()
             except Exception as e:
                 log.error(f"Idle emote error: {e}")
 
