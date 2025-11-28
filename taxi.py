@@ -6,17 +6,20 @@ import logging
 import sys
 from aiohttp import web
 
+# --- CONFIGURATION ---
 TAXI_ACCOUNT_NAME = "JarvisTaxi" 
 AUTH_FILE = "device_auths.json"
 API_PORT = 8080
 BOT_OWNER_ID = "977589162213507073" 
 
-SKIN_ID = "CID_701_Athena_Commando_M_BananaAgent"
+# Static Skin as requested
+SKIN_ID = "CID_A_189_Athena_Commando_M_Lavish_HUU31"
 EMOTE_ID = "EID_IceCream"
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger("TaxiService")
 
+# --- CONSTANTS ---
 FORT_STATS_KEYS = [
     "fortitude", "offense", "resistance", "tech",
     "teamFortitude", "teamOffense", "teamResistance", "teamTech",
@@ -51,10 +54,68 @@ client = rebootpy.Client(
 )
 
 async def update_party_metadata():
+    """
+    Sets STW flags to unlock map AND injects Cosmetic flags to force the skin.
+    """
     try:
+        # --- 1. PREPARE COSMETIC PAYLOADS (From Script 2) ---
+        raw_id = SKIN_ID
+        prefixed_id = f"AthenaCharacter:{SKIN_ID}"
 
+        # MpLoadout: The "Fix" for STW skins. 
+        # We use empty variants 'v': [] to bypass entitlement checks.
+        mp_inner_data = {
+            "ac": {"i": raw_id, "v": []},                       
+            "ab": {"i": "None", "v": []},                       
+            "ag": {"i": "DefaultGlider", "v": []},              
+            "ap": {"i": "DefaultPickaxe", "v": []},             
+            
+            # Generic Instruments must be present
+            "sb": {"i": "Sparks_Bass_Generic", "v": ["0"]},     
+            "sg": {"i": "Sparks_Guitar_Generic", "v": ["0"]},   
+            "sd": {"i": "Sparks_Drum_Generic", "v": ["0"]},     
+            "sk": {"i": "Sparks_Keytar_Generic", "v": ["0"]},   
+            "sm": {"i": "Sparks_Mic_Generic", "v": ["0"]}       
+        }
+        
+        serialized_mp_data = json.dumps(mp_inner_data)
+        mp_loadout_wrapper = {
+            "MpLoadout": {
+                "d": serialized_mp_data
+            }
+        }
+
+        athena_loadout = {
+            "AthenaCosmeticLoadout": {
+                "characterPrimaryAssetId": prefixed_id,
+                "characterEKey": "",
+                "backpackDef": "None",
+                "backpackEKey": "",
+                "pickaxeDef": "AthenaPickaxe:DefaultPickaxe",
+                "pickaxeEKey": "",
+                "gliderDef": "AthenaGlider:DefaultGlider",
+                "gliderEKey": "",
+                "contrailDef": "None",
+                "contrailEKey": "",
+                "scratchpad": []
+            }
+        }
+
+        variants_loadout = {
+            "AthenaCosmeticLoadoutVariants": {
+                "vL": {
+                    "athenaCharacter": {"i": [], "vD": {}}
+                },
+                "fT": False
+            }
+        }
+
+        # --- 2. PREPARE STW PAYLOADS (From Script 1) ---
         fort_stats = {key: 5000 for key in FORT_STATS_KEYS}
+
+        # --- 3. COMBINE EVERYTHING ---
         metadata = {
+            # STW UNLOCKS
             "Default:FORTStats_j": json.dumps({"FORTStats": fort_stats}),
             "Default:SubGame_s": "Campaign",
             "Default:Location_s": "PreLobby",
@@ -70,18 +131,26 @@ async def update_party_metadata():
                 "commanderLevel": 310,
                 "collectionBookLevel": 500,
                 "hasCompletedTutorial": True
-            })
+            }),
+
+            # COSMETIC INJECTION
+            "Default:AthenaCosmeticLoadout_j": json.dumps(athena_loadout),
+            "Default:AthenaCosmeticLoadoutVariants_j": json.dumps(variants_loadout),
+            "Default:MpLoadout_j": json.dumps(mp_loadout_wrapper),
+            "Default:CampaignCosmeticLoadout_j": json.dumps(athena_loadout) # Force STW to look at Athena loadout
         }
         
-
+        # --- 4. APPLY ---
+        # Set properties locally first (helps with XMPP stability)
         for key, value in metadata.items():
             client.party.meta.set_prop(key, value)
+            
+        # Broadcast the patch
         try:
             await client.party.me.patch(updated=metadata)
-            log.info("✅ Metadata Updated")
+            log.info(f"✅ Metadata Updated (Map Unlocked + Skin {SKIN_ID})")
         except Exception as e:
             log.error(f"Metadata patch error: {e}")
-        
         
     except Exception as e:
         log.error(f"Failed to update metadata: {e}")
@@ -141,45 +210,42 @@ async def start_server():
 @client.event
 async def event_ready():
     log.info(f"✅ Taxi Bot Online: {client.user.display_name}")
-    client.set_presence(state="Waiting for Something...")
+    client.set_presence(state="Taxi Service Active")
+    # Set metadata immediately on startup
+    await update_party_metadata()
     await start_server()
-
-@client.event
-async def event_party_invite(invitation):
-    try:
-        await update_party_metadata()
-        await invitation.accept()
-    except Exception as e:
-        log.error(f"Invite Error: {e}")
 
 @client.event
 async def event_party_invite(invitation):
     if client.party.member_count > 1:
         await invitation.decline()
-        client.set_presence(state="Busy")
+        # client.set_presence(state="Busy") # Optional
         return
+    
+    # Update Metadata BEFORE accepting to ensure we arrive correctly
     await update_party_metadata()
     await invitation.accept()
 
 
 @client.event
 async def event_party_member_join(member):
-
     if member.id == client.user.id:
         log.info("👋 I have joined the party!")
         try:
-            # await update_party_metadata()
+            # 1. Force the Metadata Update (Sets Skin + STW Unlock)
+            await update_party_metadata()
 
-            await client.party.me.set_outfit(asset=SKIN_ID)
+            # 2. Do the Emote
             await asyncio.sleep(0.5)
             await client.party.me.set_emote(asset=EMOTE_ID)
-            log.info("✅ Set outfit and emote.")
+            log.info("✅ Emote Triggered.")
             
         except Exception as e:
             log.error(f"Bot Join Error: {e}")
 
     else:
         log.info(f"👤 Member joined: {member.display_name}")
+        # Re-assert metadata when someone joins to ensure they see the unlocked map
         await update_party_metadata()
 
 if __name__ == "__main__":
