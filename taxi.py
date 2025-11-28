@@ -14,7 +14,7 @@ BOT_OWNER_ID = "977589162213507073"
 SKIN_ID = "CID_A_189_Athena_Commando_M_Lavish_HUU31"
 EMOTE_ID = "EID_IceCream"
 BOT_MODE = "BR"
-LEVEL_TO_SHOW = 150
+LEVEL_TO_SHOW = 420
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger("TaxiService")
@@ -193,7 +193,7 @@ async def event_party_member_join(member):
                 log.info("✅ Emote Triggered.")
                 await client.party.me.set_banner(
                     icon="BannerToken_033_S12_Skull", 
-                    color="DefaultColor15", 
+                    color="DefaultColor1", 
                     season_level=LEVEL_TO_SHOW
                 )
 
