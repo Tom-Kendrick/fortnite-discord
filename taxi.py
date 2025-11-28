@@ -10,7 +10,8 @@ import random
 TAXI_ACCOUNT_NAME = "Klankeroo" 
 AUTH_FILE = "device_auths.json"
 API_PORT = 8080
-BOT_OWNER_ID = "977589162213507073" 
+BOT_OWNER_ID = os.getenv("BOT_ID")
+MY_ACCOUNT_ID = os.getenv("MY_ACCOUNT")
 
 SKIN_ID = "CID_A_189_Athena_Commando_M_Lavish_HUU31"
 EMOTE_ID = ["EID_Wave", "EID_AmazingForever_Q68W0"]
@@ -236,14 +237,14 @@ async def event_party_member_update(member):
     global last_leader_emote
     if member.id == client.user.id:
         return
-    if client.party.leader and member.id == client.party.leader.id:
+    if member.id == MY_ACCOUNT_ID:
         current_emote = member.emote
         if current_emote != last_leader_emote:
             if current_emote:
-                log.info(f"💃 Mirroring Leader: {current_emote}")
+                log.info(f"💃 Mirroring The Goat: {current_emote}")
                 await client.party.me.set_emote(asset=current_emote)
             else:
-                log.info("Leader stopped. Clearing emote.")
+                log.info("The Goat stopped. Clearing emote.")
                 await client.party.me.clear_emote()
             last_leader_emote = current_emote
         else:

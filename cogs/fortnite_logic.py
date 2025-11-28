@@ -257,7 +257,7 @@ class Fortnite(commands.Cog):
 
             embed = discord.Embed(title=f"💰 V-Bucks: {display_name}", color=discord.Color.green())
             embed.description = f"## **{vbucks_count:,}** V-Bucks"
-            embed.set_footer(text=f"Account ID: {account_id}")
+            
             
             await status_msg.edit(content=None, embed=embed)
 
