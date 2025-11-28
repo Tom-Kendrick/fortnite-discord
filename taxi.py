@@ -177,6 +177,7 @@ async def event_ready():
     await update_party_metadata()
     await start_server()
     await client.party.set_privacy(rebootpy.PartyPrivacy.PRIVATE)
+    client.loop.create_task(idle_task())
 
 @client.event
 async def event_party_invite(invitation):
