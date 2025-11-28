@@ -104,6 +104,8 @@ async def update_party_metadata():
         fort_stats = {key: 5000 for key in FORT_STATS_KEYS}
 
         metadata = {
+            "Default:SeasonLevel_d": "1000",
+            "Default:BattlePassLevel_d": "1000",
             "Default:FORTStats_j": json.dumps({"FORTStats": fort_stats}),
             "Default:SubGame_s": "Campaign",
             "Default:Location_s": "PreLobby",
@@ -120,8 +122,7 @@ async def update_party_metadata():
                 "collectionBookLevel": 500,
                 "hasCompletedTutorial": True
             }),
-
-     
+            
             "Default:AthenaCosmeticLoadout_j": json.dumps(athena_loadout),
             "Default:AthenaCosmeticLoadoutVariants_j": json.dumps(variants_loadout),
             "Default:MpLoadout_j": json.dumps(mp_loadout_wrapper),
@@ -248,6 +249,12 @@ async def event_party_member_update(member):
         elif member.ready == rebootpy.ReadyState.NOT_READY:
             await client.party.me.set_ready(rebootpy.ReadyState.NOT_READY)
             log.info("zzZ Leader unreadied -> Bot Unreadied.")
+
+        if member.emote:
+            await client.party.me.set_emote(asset=member.emote)
+            log.info(f"💃 Mirroring Emote: {member.emote}")
+        else:
+            await client.party.me.clear_emote()
 
 
 if __name__ == "__main__":
