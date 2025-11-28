@@ -5,6 +5,7 @@ import os
 import logging
 import sys
 from aiohttp import web
+import random
 
 TAXI_ACCOUNT_NAME = "Klankeroo" 
 AUTH_FILE = "device_auths.json"
@@ -12,7 +13,8 @@ API_PORT = 8080
 BOT_OWNER_ID = "977589162213507073" 
 
 SKIN_ID = "CID_A_189_Athena_Commando_M_Lavish_HUU31"
-EMOTE_ID = "EID_Wave"
+EMOTE_ID = ["EID_Wave", "EID_AmazingForever_Q68W0"]
+EMOTE_ID_IDLE = ["EID_SpongeHollow", "EID_IgniteEgg_Jab", "EID_MikeCheck", "EID_YouBoreMe", "EID_ChairTime", "EID_Texting", "EID_HighActivity", "EID_Facepalm"]
 BOT_MODE = "STW"
 LEVEL_TO_SHOW = 420
 
@@ -155,6 +157,19 @@ async def start_server():
     log.info(f"🌐 API listening on http://127.0.0.1:{API_PORT}")
 
 
+async def idle_task():
+    while True:
+        await asyncio.sleep(60)
+        if client.party:
+            try:
+                await client.party.me.clear_emote()
+                await asyncio.sleep(0.5) 
+                
+                await client.party.me.set_emote(asset=random.choice(EMOTE_ID_IDLE))
+            except Exception as e:
+                log.error(f"Idle emote error: {e}")
+
+
 @client.event
 async def event_ready():
     log.info(f"✅ Taxi Bot Online: {client.user.display_name}")
@@ -195,7 +210,7 @@ async def event_party_member_join(member):
                 client.set_presence(status="❌ Taxi Busy")
 
                 await asyncio.sleep(1)
-                await client.party.me.set_emote(asset=EMOTE_ID)
+                await client.party.me.set_emote(asset=random.choice(EMOTE_ID))
                 log.info("✅ Emote Triggered.")
                 await client.party.me.set_banner(
                     icon="BannerToken_033_S12_Skull", 
