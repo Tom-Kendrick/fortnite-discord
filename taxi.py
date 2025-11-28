@@ -195,7 +195,7 @@ async def start_server():
 @client.event
 async def event_ready():
     log.info(f"✅ Taxi Bot Online: {client.user.display_name}")
-    client.set_presence(status="Taxi Service Active")
+    client.set_presence(status="✅ Taxi Ready")
     await update_party_metadata()
     await start_server()
 
@@ -207,6 +207,14 @@ async def event_party_invite(invitation):
     await update_party_metadata()
     await invitation.accept()
 
+@client.event
+async def event_party_member_leave(member):
+    if member.id == client.user.id:
+        log.info("👋 I have left the party.")
+        client.set_presence(status="✅ Taxi Ready")
+    else:
+        log.info(f"👤 Member left: {member.display_name}")
+        await update_party_metadata()
 
 @client.event
 async def event_party_member_join(member):
@@ -215,10 +223,12 @@ async def event_party_member_join(member):
             log.info("👋 I have joined the party!")
             try:
                 await update_party_metadata()
+                client.set_presence(status="❌ Taxi Busy")
 
                 await asyncio.sleep(0.5)
                 await client.party.me.set_emote(asset=EMOTE_ID)
                 log.info("✅ Emote Triggered.")
+
                 
             except Exception as e:
                 log.error(f"Bot Join Error: {e}")
