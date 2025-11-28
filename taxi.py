@@ -161,6 +161,7 @@ async def event_ready():
     client.set_presence(status="✅ Taxi Ready")
     await update_party_metadata()
     await start_server()
+    await client.party.set_privacy(rebootpy.PartyPrivacy.PRIVATE)
 
 @client.event
 async def event_party_invite(invitation):
@@ -175,6 +176,7 @@ async def event_party_member_leave(member):
     if member.id == client.user.id:
         log.info("👋 I have left the party.")
         client.set_presence(status="✅ Taxi Ready")
+        await client.party.set_privacy(rebootpy.PartyPrivacy.PRIVATE)
     else:
         log.info(f"👤 Member left: {member.display_name}")
         await update_party_metadata()
