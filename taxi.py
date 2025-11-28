@@ -6,7 +6,7 @@ import logging
 import sys
 from aiohttp import web
 
-TAXI_ACCOUNT_NAME = "JarvisTaxi" 
+TAXI_ACCOUNT_NAME = "Klankeroo" 
 AUTH_FILE = "device_auths.json"
 API_PORT = 8080
 BOT_OWNER_ID = "977589162213507073" 
@@ -165,6 +165,7 @@ async def event_ready():
 
 @client.event
 async def event_party_invite(invitation):
+    #if invitation.sender.id == 
     if client.party.member_count > 1:
         await invitation.decline()
         return
