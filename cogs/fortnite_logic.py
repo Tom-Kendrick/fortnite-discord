@@ -411,7 +411,7 @@ class Fortnite(commands.Cog):
 
                 embed.description = stats_text
                 embed.add_field(name="V-Bucks", value=f"{vbucks_count:,}", inline=False)
-                embed.set_footer(text=f"Account ID: {account_id}")
+                
                 
                 view = discord.ui.View()
                 if locker_link and len(locker_link) <= 512:
