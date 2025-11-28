@@ -13,7 +13,7 @@ BOT_OWNER_ID = "977589162213507073"
 
 SKIN_ID = "CID_A_189_Athena_Commando_M_Lavish_HUU31"
 EMOTE_ID = "EID_IceCream"
-BOT_MODE = "BR"
+BOT_MODE = "STW"
 LEVEL_TO_SHOW = 420
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
