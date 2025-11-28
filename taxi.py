@@ -237,6 +237,19 @@ async def event_party_member_join(member):
 
         await update_party_metadata()
 
+@client.event
+async def event_party_member_update(member):
+    if member.id == client.user.id:
+        return
+    if client.party.leader and member.id == client.party.leader.id:
+        if member.ready == rebootpy.ReadyState.READY:
+            await client.party.me.set_ready(rebootpy.ReadyState.READY)
+            log.info("✅ Leader is Ready -> Bot Readied Up!")
+        elif member.ready == rebootpy.ReadyState.NOT_READY:
+            await client.party.me.set_ready(rebootpy.ReadyState.NOT_READY)
+            log.info("zzZ Leader unreadied -> Bot Unreadied.")
+
+
 if __name__ == "__main__":
     try:
         client.run()
