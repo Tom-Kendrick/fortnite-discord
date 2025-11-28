@@ -192,7 +192,7 @@ async def event_party_member_join(member):
                 await client.party.me.set_emote(asset=EMOTE_ID)
                 log.info("✅ Emote Triggered.")
                 await client.party.me.set_banner(
-                    icon="StandardBanner1", 
+                    icon="BannerToken_033_S12_Skull", 
                     color="DefaultColor1", 
                     season_level=LEVEL_TO_SHOW
                 )
