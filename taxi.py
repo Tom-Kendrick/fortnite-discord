@@ -12,7 +12,7 @@ API_PORT = 8080
 BOT_OWNER_ID = "977589162213507073" 
 
 SKIN_ID = "CID_A_189_Athena_Commando_M_Lavish_HUU31"
-EMOTE_ID = "EID_IceCream"
+EMOTE_ID = "EID_Wave"
 BOT_MODE = "STW"
 LEVEL_TO_SHOW = 420
 
@@ -178,6 +178,8 @@ async def event_party_member_leave(member):
         client.set_presence(status="✅ Taxi Ready")
         await client.party.set_privacy(rebootpy.PartyPrivacy.PRIVATE)
     else:
+        if client.party.member_count == 1:
+            client.set_presence(status="✅ Taxi Ready")
         log.info(f"👤 Member left: {member.display_name}")
         await update_party_metadata()
 
@@ -190,7 +192,7 @@ async def event_party_member_join(member):
                 await update_party_metadata()
                 client.set_presence(status="❌ Taxi Busy")
 
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(2)
                 await client.party.me.set_emote(asset=EMOTE_ID)
                 log.info("✅ Emote Triggered.")
                 await client.party.me.set_banner(
