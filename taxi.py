@@ -168,7 +168,7 @@ async def event_party_invite(invitation):
     if client.party.member_count > 1:
         await invitation.decline()
         return
-    await update_party_metadata()
+    #await update_party_metadata()
     await invitation.accept()
 
 @client.event
@@ -180,8 +180,9 @@ async def event_party_member_leave(member):
     else:
         if client.party.member_count == 1:
             client.set_presence(status="✅ Taxi Ready")
+            await client.party.set_privacy(rebootpy.PartyPrivacy.PRIVATE)
         log.info(f"👤 Member left: {member.display_name}")
-        await update_party_metadata()
+        #await update_party_metadata()
 
 @client.event
 async def event_party_member_join(member):
@@ -192,7 +193,7 @@ async def event_party_member_join(member):
                 await update_party_metadata()
                 client.set_presence(status="❌ Taxi Busy")
 
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
                 await client.party.me.set_emote(asset=EMOTE_ID)
                 log.info("✅ Emote Triggered.")
                 await client.party.me.set_banner(
@@ -209,23 +210,25 @@ async def event_party_member_join(member):
 
         await update_party_metadata()
 
+last_leader_emote = None
+
 @client.event
 async def event_party_member_update(member):
+    global last_leader_emote
     if member.id == client.user.id:
         return
     if client.party.leader and member.id == client.party.leader.id:
-        if member.ready == rebootpy.ReadyState.READY:
-            await client.party.me.set_ready(rebootpy.ReadyState.READY)
-            log.info("✅ Leader is Ready -> Bot Readied Up!")
-        elif member.ready == rebootpy.ReadyState.NOT_READY:
-            await client.party.me.set_ready(rebootpy.ReadyState.NOT_READY)
-            log.info("zzZ Leader unreadied -> Bot Unreadied.")
-
-        if member.emote:
-            await client.party.me.set_emote(asset=member.emote)
-            log.info(f"💃 Mirroring Emote: {member.emote}")
+        current_emote = member.emote
+        if current_emote != last_leader_emote:
+            if current_emote:
+                log.info(f"💃 Mirroring Leader: {current_emote}")
+                await client.party.me.set_emote(asset=current_emote)
+            else:
+                log.info("Leader stopped. Clearing emote.")
+                await client.party.me.clear_emote()
+            last_leader_emote = current_emote
         else:
-            await client.party.me.clear_emote()
+            pass
 
 
 if __name__ == "__main__":
