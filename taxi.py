@@ -13,6 +13,7 @@ BOT_OWNER_ID = "977589162213507073"
 
 SKIN_ID = "CID_A_189_Athena_Commando_M_Lavish_HUU31"
 EMOTE_ID = "EID_IceCream"
+BOT_MODE = "BR"
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger("TaxiService")
@@ -51,92 +52,55 @@ client = rebootpy.Client(
 )
 
 async def update_party_metadata():
-
     try:
         raw_id = SKIN_ID
         prefixed_id = f"AthenaCharacter:{SKIN_ID}"
 
         mp_inner_data = {
-            "ac": {"i": raw_id, "v": []},                       
-            "ab": {"i": "None", "v": []},                       
-            "ag": {"i": "DefaultGlider", "v": []},              
-            "ap": {"i": "DefaultPickaxe", "v": []},             
-            
-            "sb": {"i": "Sparks_Bass_Generic", "v": ["0"]},     
-            "sg": {"i": "Sparks_Guitar_Generic", "v": ["0"]},   
-            "sd": {"i": "Sparks_Drum_Generic", "v": ["0"]},     
-            "sk": {"i": "Sparks_Keytar_Generic", "v": ["0"]},   
+            "ac": {"i": raw_id, "v": []}, "ab": {"i": "None", "v": []},                       
+            "ag": {"i": "DefaultGlider", "v": []}, "ap": {"i": "DefaultPickaxe", "v": []},             
+            "sb": {"i": "Sparks_Bass_Generic", "v": ["0"]}, "sg": {"i": "Sparks_Guitar_Generic", "v": ["0"]},   
+            "sd": {"i": "Sparks_Drum_Generic", "v": ["0"]}, "sk": {"i": "Sparks_Keytar_Generic", "v": ["0"]},   
             "sm": {"i": "Sparks_Mic_Generic", "v": ["0"]}       
         }
-        
-        serialized_mp_data = json.dumps(mp_inner_data)
-        mp_loadout_wrapper = {
-            "MpLoadout": {
-                "d": serialized_mp_data
-            }
-        }
+        mp_wrapper = {"MpLoadout": {"d": json.dumps(mp_inner_data)}}
 
         athena_loadout = {
             "AthenaCosmeticLoadout": {
                 "characterPrimaryAssetId": prefixed_id,
-                "characterEKey": "",
-                "backpackDef": "None",
-                "backpackEKey": "",
-                "pickaxeDef": "AthenaPickaxe:DefaultPickaxe",
-                "pickaxeEKey": "",
-                "gliderDef": "AthenaGlider:DefaultGlider",
-                "gliderEKey": "",
-                "contrailDef": "None",
-                "contrailEKey": "",
-                "scratchpad": []
+                "backpackDef": "None", "pickaxeDef": "AthenaPickaxe:DefaultPickaxe",
+                "gliderDef": "AthenaGlider:DefaultGlider", "scratchpad": []
             }
         }
-
-        variants_loadout = {
-            "AthenaCosmeticLoadoutVariants": {
-                "vL": {
-                    "athenaCharacter": {"i": [], "vD": {}}
-                },
-                "fT": False
+        if BOT_MODE == "STW":
+            subgame = "Campaign"
+            extra_meta = {
+                "Default:FORTStats_j": json.dumps({"FORTStats": {k: 5000 for k in FORT_STATS_KEYS}}),
+                "Default:STWProgress_j": json.dumps({"accountLevel": 310, "commanderLevel": 310, "hasCompletedTutorial": True})
             }
-        }
-
-        fort_stats = {key: 5000 for key in FORT_STATS_KEYS}
+        else:
+            subgame = "BattleRoyale"
+            extra_meta = {
+                "Default:SeasonLevel_d": "1000",
+                "Default:BattlePassLevel_d": "1000"
+            }
 
         metadata = {
-            "Default:SeasonLevel_d": "1000",
-            "Default:BattlePassLevel_d": "1000",
-            "Default:FORTStats_j": json.dumps({"FORTStats": fort_stats}),
-            "Default:SubGame_s": "Campaign",
+            "Default:SubGame_s": subgame, 
             "Default:Location_s": "PreLobby",
-            "Default:HasCompletedSTWTutorial_b": "true",
-            "Default:STWCompletedTutorial_b": "true",
-            "Default:ActivityType_s": "STW",
-            "Default:STWOwnership_b": "true",
-            "Default:STWAccess_b": "true",
-            "Default:STWPurchased_b": "true",
-            "Default:STWEntitled_b": "true",
-            "Default:STWProgress_j": json.dumps({
-                "accountLevel": 310,
-                "commanderLevel": 310,
-                "collectionBookLevel": 500,
-                "hasCompletedTutorial": True
-            }),
             
             "Default:AthenaCosmeticLoadout_j": json.dumps(athena_loadout),
-            "Default:AthenaCosmeticLoadoutVariants_j": json.dumps(variants_loadout),
-            "Default:MpLoadout_j": json.dumps(mp_loadout_wrapper),
+            "Default:AthenaCosmeticLoadoutVariants_j": json.dumps({"AthenaCosmeticLoadoutVariants": {"vL": {"athenaCharacter": {"i": [], "vD": {}}}, "fT": False}}),
+            "Default:MpLoadout_j": json.dumps(mp_wrapper),
             "Default:CampaignCosmeticLoadout_j": json.dumps(athena_loadout)
         }
         
+        metadata.update(extra_meta)
+
         for key, value in metadata.items():
             client.party.meta.set_prop(key, value)
-            
-        try:
-            await client.party.me.patch(updated=metadata)
-            log.info(f"✅ Metadata Updated (Map Unlocked + Skin {SKIN_ID})")
-        except Exception as e:
-            log.error(f"Metadata patch error: {e}")
+        await client.party.me.patch(updated=metadata)
+        log.info(f"✅ Metadata Updated ({BOT_MODE} Mode)")
         
     except Exception as e:
         log.error(f"Failed to update metadata: {e}")
