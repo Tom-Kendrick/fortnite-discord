@@ -31,6 +31,21 @@ FORT_STATS_KEYS = [
     "teamFortitude_Phoenix", "teamOffense_Phoenix", "teamResistance_Phoenix", "teamTech_Phoenix"
 ]
 
+def get_id_by_name(target_name):
+    if os.path.isfile(AUTH_FILE):
+        try:
+            with open(AUTH_FILE, 'r') as f:
+                data = json.load(f)
+                accounts = data.get(MY_ACCOUNT_ID, [])
+                for acc in accounts:
+                    if acc.get("account_name", "").lower() == target_name.lower():
+                        return acc.get("account_id")
+        except:
+            pass
+    return None
+
+owner_id = get_id_by_name("Shrillkangaroo")
+
 def get_taxi_auth():
     if os.path.isfile(AUTH_FILE):
         try:
@@ -44,6 +59,7 @@ def get_taxi_auth():
                             "account_id": acc["account_id"],
                             "secret": acc["secret"]
                         }
+                
         except Exception as e:
             log.error(f"Error reading auth file: {e}")
     return None
@@ -239,7 +255,7 @@ async def event_party_member_update(member):
     global last_leader_emote
     if member.id == client.user.id:
         return
-    if member.id == MY_ACCOUNT_ID:
+    if member.id == owner_id:
         current_emote = member.emote
         if current_emote != last_leader_emote:
             if current_emote:
