@@ -255,6 +255,7 @@ async def event_party_member_update(member):
     global last_leader_emote
     if member.id == client.user.id:
         return
+    log.debug(f"🔄 Member update: {member.id, owner_id}")
     if member.id == owner_id:
         current_emote = member.emote
         if current_emote != last_leader_emote:
