@@ -6,10 +6,12 @@ import logging
 import sys
 from aiohttp import web
 import random
+from dotenv import load_dotenv
 
 TAXI_ACCOUNT_NAME = "Klankeroo" 
 AUTH_FILE = "device_auths.json"
 API_PORT = 8080
+load_dotenv()
 BOT_OWNER_ID = os.getenv("BOT_ID")
 MY_ACCOUNT_ID = os.getenv("MY_ACCOUNT")
 
