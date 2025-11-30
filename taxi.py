@@ -185,7 +185,7 @@ async def idle_task():
                 await asyncio.sleep(0.5)
                 
                 await client.party.me.set_emote(asset=random.choice(EMOTE_ID_IDLE))
-                await asyncio.sleep(10)
+                await asyncio.sleep(60)
                 await client.party.me.clear_emote()
             except Exception as e:
                 log.error(f"Idle emote error: {e}")
