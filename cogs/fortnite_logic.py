@@ -649,10 +649,8 @@ class Fortnite(commands.Cog):
                 
                 data = await resp.json()
 
-        # 3. Parse Quests
         quests = []
         try:
-            # Navigate the JSON response
             profile_changes = data.get("profileChanges", [])
             if not profile_changes:
                 await ctx.send("❌ No profile data found.")
@@ -660,36 +658,26 @@ class Fortnite(commands.Cog):
                 
             items = profile_changes[0].get("profile", {}).get("items", {})
             
-            # Filter for Daily Quests
             for item_id, item_data in items.items():
                 template_id = item_data.get("templateId", "")
                 
-                # Check if it's a Daily Quest and is Active
                 if template_id.startswith("Quest:daily_") and item_data["attributes"].get("quest_state") == "Active":
-                    
-                    # -- Formatting Name --
-                    # Removes "Quest:daily_" and replaces underscores
                     raw_name = template_id.split("daily_")[-1].replace("_", " ").title()
                     
-                    # -- Getting Progress --
                     attributes = item_data.get("attributes", {})
                     current_progress = 0
                     
-                    # Find the completion value (keys look like "completion_destroy_gnomes")
                     for key, val in attributes.items():
                         if key.startswith("completion_"):
                             current_progress = val
                             break
                     
-                    # Spitfire Launcher Logic for Target info would go here
-                    # For now, we display what we have:
                     quests.append(f"📜 **{raw_name}**\n   Progress: `{current_progress}`")
 
         except Exception as e:
             await ctx.send(f"❌ Error parsing quests: {e}")
             return
 
-        # 4. Send Result
         if quests:
             embed = discord.Embed(
                 title=f"📅 Daily Quests for {auth['account_name']}",
