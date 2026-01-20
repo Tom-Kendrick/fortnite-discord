@@ -191,6 +191,7 @@ class Fortnite(commands.Cog):
                     return 0, f"HTTP {resp.status}"
                 
                 data = await resp.json()
+                json.dump(data, open("debug_profile.json", "w"), indent=4)
                 if 'profileChanges' in data:
                     for change in data['profileChanges']:
                         if 'profile' in change and 'items' in change['profile']:
@@ -300,6 +301,175 @@ class Fortnite(commands.Cog):
         description += f"\n\n**GRAND TOTAL: {grand_total:,} V-Bucks**"
         embed.description = description
         embed.set_footer(text=f"Checked {len(my_accounts)} accounts for {ctx.author.name}")
+
+        await status_msg.edit(content=None, embed=embed)
+
+    @commands.hybrid_command(name="dailies", description="Claim and view active STW Daily Quests")
+    @app_commands.describe(name="Account name (leave empty for first account)")
+    async def dailies(self, ctx, *, name: str = None):
+        await ctx.defer()
+        
+        device_auths = self.get_auth_details(ctx.author.id, name)
+        
+        if not device_auths:
+            if name:
+                await ctx.send(f"❌ Account `{name}` not found in your list.")
+            else:
+                await ctx.send("❌ You haven't added any accounts yet! Use `/login`.")
+            return
+
+        status_msg = await ctx.send(f"🔄 Checking **{device_auths['account_name']}**...")
+
+        async with aiohttp.ClientSession() as session:
+            token_data, error = await self._authenticate(session, device_auths)
+            if error:
+                await status_msg.edit(content=f"❌ Auth failed: `{error}`")
+                return
+
+            access_token = token_data['access_token']
+            account_id = token_data['account_id']
+            display_name = token_data.get('displayName', 'Unknown')
+
+            base_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client"
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            params = {
+                "profileId": "campaign",
+                "rvn": "-1"
+            }
+
+            async with session.post(f"{base_url}/ClientQuestLogin", params=params, json={}, headers=headers) as resp:
+                if resp.status != 200:
+                    print(f"Warning: ClientQuestLogin failed with {resp.status}")
+            async with session.post(f"{base_url}/QueryProfile", params=params, json={}, headers=headers) as resp:
+                if resp.status != 200:
+                    err_text = await resp.text()
+                    await status_msg.edit(content=f"❌ Failed to fetch profile: `{resp.status}`\n```{err_text[:100]}```")
+                    return
+                
+                data = await resp.json()
+            try:
+                if "profileChanges" in data:
+                    items = data["profileChanges"][0]["profile"]["items"]
+                else:
+                    items = data.get("items", {})
+            except (KeyError, IndexError):
+                items = {}
+
+            active_dailies = []
+
+            for item_id, item_data in items.items():
+                template_id = item_data.get("templateId", "")
+                attributes = item_data.get("attributes", {})
+
+                if template_id.startswith("Quest:daily_") and attributes.get("quest_state") == "Active":
+                    
+                    raw_name = template_id.replace("Quest:daily_", "").replace("_", " ").title()
+                    
+                    current = 0
+                    target = 0
+                    for obj in attributes.get("objectives", []):
+                        current = obj.get("completionCount", 0)
+                        break 
+                    
+                    active_dailies.append(f"• **{raw_name}**\n   *Progress: {current}*")
+
+            embed = discord.Embed(title=f"📜 Daily Quests: {display_name}", color=discord.Color.purple())
+            
+            if active_dailies:
+                embed.description = "\n".join(active_dailies)
+                embed.set_footer(text=f"Total Active: {len(active_dailies)}/3")
+            else:
+                embed.description = "✅ No active daily quests found (or all completed)."
+
+            await status_msg.edit(content=None, embed=embed)
+
+    @commands.hybrid_command(name="dailiesbulk", description="Claim and check Daily Quests for ALL accounts")
+    async def dailiesbulk(self, ctx):
+        await ctx.defer()
+        
+        my_accounts = self.get_user_accounts(ctx.author.id)
+        
+        if not my_accounts:
+            await ctx.send("❌ You haven't added any accounts yet! Use `/login`.")
+            return
+
+        status_msg = await ctx.send(f"🔄 Processing {len(my_accounts)} accounts (this may take a moment)...")
+        results = []
+        
+        total_active_quests = 0
+        accounts_checked = 0
+
+        async with aiohttp.ClientSession() as session:
+            for auth_details in my_accounts:
+                accounts_checked += 1
+                name = auth_details['account_name']
+                
+                token_data, error = await self._authenticate(session, auth_details)
+                if error:
+                    results.append(f"❌ **{name}**: Auth Failed")
+                    continue
+
+                access_token = token_data['access_token']
+                account_id = token_data['account_id']
+                display_name = token_data.get('displayName', name)
+
+                base_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client"
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json"
+                }
+                params = {"profileId": "campaign", "rvn": "-1"}
+
+                try:
+                    await session.post(f"{base_url}/ClientQuestLogin", params=params, json={}, headers=headers)
+
+                    async with session.post(f"{base_url}/QueryProfile", params=params, json={}, headers=headers) as resp:
+                        if resp.status != 200:
+                            results.append(f"⚠️ **{display_name}**: HTTP {resp.status}")
+                            continue
+                        
+                        data = await resp.json()
+
+                    if "profileChanges" in data:
+                        items = data["profileChanges"][0]["profile"]["items"]
+                    else:
+                        items = data.get("items", {})
+
+                    account_dailies = []
+                    
+                    for item_data in items.values():
+                        template_id = item_data.get("templateId", "")
+                        attributes = item_data.get("attributes", {})
+
+                        if template_id.startswith("Quest:daily_") and attributes.get("quest_state") == "Active":
+                            quest_name = template_id.replace("Quest:daily_", "").replace("_", " ").title()
+                            
+                            current = 0
+                            for obj in attributes.get("objectives", []):
+                                current = obj.get("completionCount", 0)
+                                break
+                            
+                            account_dailies.append(f"{quest_name} ({current})")
+                            total_active_quests += 1
+
+                    if account_dailies:
+                        quest_str = ", ".join(account_dailies)
+                        results.append(f"✅ **{display_name}**: {quest_str}")
+                    else:
+                        results.append(f"🎉 **{display_name}**: All Done!")
+
+                except Exception as e:
+                    results.append(f"⚠️ **{display_name}**: Error ({str(e)})")
+
+        embed = discord.Embed(title="📜 Bulk Daily Quests Report", color=discord.Color.purple())
+        
+        description = "\n".join(results)
+        embed.description = description
+        
+        embed.set_footer(text=f"Checked {accounts_checked} accounts • {total_active_quests} Total Active Quests")
 
         await status_msg.edit(content=None, embed=embed)
 
@@ -453,6 +623,83 @@ class Fortnite(commands.Cog):
                         await ctx.send(f"❌ Taxi Error: {text}")
         except Exception as e:
             await ctx.send(f"❌ Taxi Service is OFFLINE. (Error: {e})")
+
+
+    @commands.hybrid_command(name="dailies", description="STW Daily Quests")
+    @app_commands.describe(name="Account name (leave empty for first account)")
+    async def dailies(self, ctx, *, name: str = None):
+        await ctx.defer()
+
+        device_auths = self.get_auth_details(ctx.author.id, name)
+        if not device_auths:
+            await ctx.send("❌ Account not found.")
+            return
+
+        
+        profile_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{auth['account_id']}/client/QueryProfile?profileId=campaign&rvn=-1"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                profile_url, 
+                json={}, 
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+            ) as resp:
+                if resp.status != 200:
+                    await ctx.send(f"❌ Failed to fetch profile: {resp.status}")
+                    return
+                
+                data = await resp.json()
+
+        # 3. Parse Quests
+        quests = []
+        try:
+            # Navigate the JSON response
+            profile_changes = data.get("profileChanges", [])
+            if not profile_changes:
+                await ctx.send("❌ No profile data found.")
+                return
+                
+            items = profile_changes[0].get("profile", {}).get("items", {})
+            
+            # Filter for Daily Quests
+            for item_id, item_data in items.items():
+                template_id = item_data.get("templateId", "")
+                
+                # Check if it's a Daily Quest and is Active
+                if template_id.startswith("Quest:daily_") and item_data["attributes"].get("quest_state") == "Active":
+                    
+                    # -- Formatting Name --
+                    # Removes "Quest:daily_" and replaces underscores
+                    raw_name = template_id.split("daily_")[-1].replace("_", " ").title()
+                    
+                    # -- Getting Progress --
+                    attributes = item_data.get("attributes", {})
+                    current_progress = 0
+                    
+                    # Find the completion value (keys look like "completion_destroy_gnomes")
+                    for key, val in attributes.items():
+                        if key.startswith("completion_"):
+                            current_progress = val
+                            break
+                    
+                    # Spitfire Launcher Logic for Target info would go here
+                    # For now, we display what we have:
+                    quests.append(f"📜 **{raw_name}**\n   Progress: `{current_progress}`")
+
+        except Exception as e:
+            await ctx.send(f"❌ Error parsing quests: {e}")
+            return
+
+        # 4. Send Result
+        if quests:
+            embed = discord.Embed(
+                title=f"📅 Daily Quests for {auth['account_name']}",
+                description="\n\n".join(quests),
+                color=discord.Color.green()
+            )
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("✅ You have no active Daily Quests!")
+
 
 async def setup(bot):
     await bot.add_cog(Fortnite(bot))
