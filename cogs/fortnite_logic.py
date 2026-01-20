@@ -266,6 +266,8 @@ class Fortnite(commands.Cog):
     async def vbucksbulk(self, ctx):
         await ctx.defer()
         
+
+        
         my_accounts = self.get_user_accounts(ctx.author.id)
         
         if not my_accounts:
@@ -309,6 +311,13 @@ class Fortnite(commands.Cog):
     async def dailies(self, ctx, *, name: str = None):
         await ctx.defer()
         
+        daily_defs = {}
+        try:
+            with open("../constants/stw_dailies.json", "r", encoding="utf-8") as f:
+                daily_defs = json.load(f)
+        except Exception as e:
+            print(f"⚠️ Could not load daily definitions: {e}")
+
         device_auths = self.get_auth_details(ctx.author.id, name)
         
         if not device_auths:
@@ -343,6 +352,7 @@ class Fortnite(commands.Cog):
             async with session.post(f"{base_url}/ClientQuestLogin", params=params, json={}, headers=headers) as resp:
                 if resp.status != 200:
                     print(f"Warning: ClientQuestLogin failed with {resp.status}")
+
             async with session.post(f"{base_url}/QueryProfile", params=params, json={}, headers=headers) as resp:
                 if resp.status != 200:
                     err_text = await resp.text()
@@ -350,6 +360,7 @@ class Fortnite(commands.Cog):
                     return
                 
                 data = await resp.json()
+
             try:
                 if "profileChanges" in data:
                     items = data["profileChanges"][0]["profile"]["items"]
@@ -366,15 +377,31 @@ class Fortnite(commands.Cog):
 
                 if template_id.startswith("Quest:daily_") and attributes.get("quest_state") == "Active":
                     
-                    raw_name = template_id.replace("Quest:daily_", "").replace("_", " ").title()
+                    clean_id = template_id.replace("Quest:", "")
                     
                     current = 0
-                    target = 0
                     for obj in attributes.get("objectives", []):
                         current = obj.get("completionCount", 0)
                         break 
                     
-                    active_dailies.append(f"• **{raw_name}**\n   *Progress: {current}*")
+                    if clean_id in daily_defs:
+                        info = daily_defs[clean_id]
+                        quest_name = info["names"].get("en", clean_id)
+                        target = info.get("limit", "?")
+                        
+                        rewards = info.get("rewards", {})
+                        reward_str = ""
+                        if "mtx" in rewards and rewards["mtx"] > 0:
+                            reward_str += f" <:vbucks:> **{rewards['mtx']}**"
+                        elif "gold" in rewards:
+                            reward_str += f" 🟡 **{rewards['gold']}**"
+                            
+                        entry_str = f"• **{quest_name}**\n   `{current}/{target}` {reward_str}"
+                    else:
+                        raw_name = clean_id.replace("daily_", "").replace("_", " ").title()
+                        entry_str = f"• **{raw_name}**\n   `Progress: {current}`"
+
+                    active_dailies.append(entry_str)
 
             embed = discord.Embed(title=f"📜 Daily Quests: {display_name}", color=discord.Color.purple())
             
