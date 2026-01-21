@@ -323,19 +323,19 @@ class Fortnite(commands.Cog):
             target = info.get("limit", "?")
             
             rewards = info.get("rewards", {})
-            reward_str = ""
             vbucks = rewards.get("mtx", 0)
             gold = rewards.get("gold", 0)
 
+            reward_str = ""
             if vbucks > 0:
                 reward_str = f" <:vbucks:> **{vbucks}**"
             elif gold > 0:
                 reward_str = f" 🟡 **{gold}**"
                 
-            return f"**{quest_name}**\n`{current}/{target}` {reward_str}", vbucks
+            return f"• **{quest_name}**\n   `{current}/{target}` {reward_str}", vbucks
         
         raw_name = clean_id.replace("daily_", "").replace("_", " ").title()
-        return f"**{raw_name}**\n`Progress: {current}`", 0
+        return f"• **{raw_name}**\n   `Progress: {current}`", 0
 
     @commands.hybrid_command(name="dailiesbulk", description="Check Daily Quests for ALL accounts")
     async def dailiesbulk(self, ctx):
