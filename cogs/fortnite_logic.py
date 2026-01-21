@@ -328,7 +328,7 @@ class Fortnite(commands.Cog):
 
             reward_str = ""
             if vbucks > 0:
-                reward_str = f" <:vbucks:> **{vbucks}**"
+                reward_str = f" <:VBuck:1463527479216967844> **{vbucks}**"
             elif gold > 0:
                 reward_str = f" 🟡 **{gold}**"
                 
