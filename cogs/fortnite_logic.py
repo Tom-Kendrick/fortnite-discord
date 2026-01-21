@@ -310,21 +310,22 @@ class Fortnite(commands.Cog):
         template_id = item_data.get("templateId", "")
         attributes = item_data.get("attributes", {})
         
-        clean_id = template_id.replace("Quest:", "").lower()
-        
+        clean_id = template_id.lower().replace("quest:", "").strip()
         current = 0
-        objectives = attributes.get("objectives", [])
-        if objectives:
-            current = objectives[0].get("completionCount", 0)
+        for obj in attributes.get("objectives", []):
+            current = max(current, obj.get("completionCount", 0))
+        
+        for key, value in attributes.items():
+            if key.startswith("completion_") and isinstance(value, int):
+                current = max(current, value)
 
         if clean_id in daily_defs:
             info = daily_defs[clean_id]
             quest_name = info.get("names", {}).get("en", clean_id)
             target = info.get("limit", 0)
             
-            rewards = info.get("rewards", {})
-            vbucks = rewards.get("mtx", 0)
-            gold = rewards.get("gold", 0)
+            vbucks = info.get("rewards", {}).get("mtx", 0)
+            gold = info.get("rewards", {}).get("gold", 0)
 
             reward_str = ""
             if vbucks > 0:
@@ -334,8 +335,8 @@ class Fortnite(commands.Cog):
                 
             return f"• **{quest_name}**\n   `{current}/{target}` {reward_str}", vbucks
         
-        fallback_name = clean_id.replace("daily_", "").replace("_", " ").title()
-        return f"• **{fallback_name}** (Not in JSON)\n   `Progress: {current}`", 0
+        fallback = clean_id.replace("daily_", "").replace("_", " ").title()
+        return f"• **{fallback}**\n   `{current}/?` (Missing JSON)", 0
 
 
     @commands.hybrid_command(name="dailiesbulk", description="Check Daily Quests for ALL accounts in a grid")
