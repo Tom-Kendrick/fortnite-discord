@@ -488,7 +488,7 @@ class Fortnite(commands.Cog):
                     if found_quests == 0:
                         embed.add_field(name="Status", value="🎉 All Done!", inline=True)
                 
-                    embed.add_field(name="\u200b", value="\u200b", inline=False)
+                    #embed.add_field(name="\u200b", value="\u200b", inline=False)
 
                 except Exception as e:
                     embed.add_field(name="Error", value=str(e), inline=True)
