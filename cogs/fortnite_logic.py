@@ -310,17 +310,17 @@ class Fortnite(commands.Cog):
         template_id = item_data.get("templateId", "")
         attributes = item_data.get("attributes", {})
         
-        clean_id = template_id.replace("Quest:", "")
+        clean_id = template_id.replace("Quest:", "").lower()
         
         current = 0
-        for obj in attributes.get("objectives", []):
-            current = obj.get("completionCount", 0)
-            break 
+        objectives = attributes.get("objectives", [])
+        if objectives:
+            current = objectives[0].get("completionCount", 0)
 
         if clean_id in daily_defs:
             info = daily_defs[clean_id]
-            quest_name = info["names"].get("en", clean_id)
-            target = info.get("limit", "?")
+            quest_name = info.get("names", {}).get("en", clean_id)
+            target = info.get("limit", 0)
             
             rewards = info.get("rewards", {})
             vbucks = rewards.get("mtx", 0)
@@ -334,11 +334,11 @@ class Fortnite(commands.Cog):
                 
             return f"• **{quest_name}**\n   `{current}/{target}` {reward_str}", vbucks
         
-        raw_name = clean_id.replace("daily_", "").replace("_", " ").title()
-        return f"• **{raw_name}**\n   `Progress: {current}`", 0
+        fallback_name = clean_id.replace("daily_", "").replace("_", " ").title()
+        return f"• **{fallback_name}** (Not in JSON)\n   `Progress: {current}`", 0
 
 
-    @commands.hybrid_command(name="dailiesbulk", description="Claim and check Daily Quests for ALL accounts")
+    @commands.hybrid_command(name="dailiesbulk", description="Check Daily Quests for ALL accounts")
     async def dailiesbulk(self, ctx):
         await ctx.defer()
         
@@ -348,11 +348,13 @@ class Fortnite(commands.Cog):
             return
 
         daily_defs = {}
+        json_path = "../constants/stw_dailies.json" 
+        
         try:
-            with open("../constants/stw_dailies.json", "r", encoding="utf-8") as f:
+            with open(json_path, "r", encoding="utf-8") as f:
                 daily_defs = json.load(f)
         except Exception as e:
-            print(f"⚠️ Could not load daily definitions: {e}")
+            print(f"⚠️ Error loading {json_path}: {e}")
 
         status_msg = await ctx.send(f"🔄 Checking {len(my_accounts)} accounts...")
         
@@ -382,23 +384,22 @@ class Fortnite(commands.Cog):
 
                     items = data["profileChanges"][0]["profile"]["items"] if "profileChanges" in data else data.get("items", {})
                     
-                    quest_strings = []
+                    quest_lines = []
                     for item_data in items.values():
                         tid = item_data.get("templateId", "")
-                        if tid.startswith("Quest:daily_") and item_data.get("attributes", {}).get("quest_state") == "Active":
-                            quest_text, vbuck_value = self.format_quest_info(item_data, daily_defs)
-                            
-                            quest_strings.append(quest_text)
-                            total_vbucks += vbuck_value
+                        if tid.lower().startswith("quest:daily_") and item_data.get("attributes", {}).get("quest_state") == "Active":
+                            quest_text, v_val = self.format_quest_info(item_data, daily_defs)
+                            quest_lines.append(quest_text)
+                            total_vbucks += v_val
                             total_quests += 1
 
-                    account_content = "\n".join(quest_strings) if quest_strings else "✅ All quests completed!"
-                    embed.add_field(name=f"👤 {display_name}", value=account_content, inline=False)
+                    val_text = "\n".join(quest_lines) if quest_lines else "✅ *All quests completed*"
+                    embed.add_field(name=f"👤 {display_name}", value=val_text, inline=False)
 
                 except Exception as e:
                     embed.add_field(name=f"👤 {display_name}", value=f"⚠️ Error: {str(e)[:50]}", inline=False)
 
-        embed.set_footer(text=f"Total: {total_quests} Quests • {total_vbucks} V-Bucks across all accounts")
+        embed.set_footer(text=f"Total: {total_quests} Quests • {total_vbucks} V-Bucks Pending")
         await status_msg.edit(content=None, embed=embed)
         
     @commands.hybrid_command(name="locker", description="Generate a Fortnite.GG locker link")
