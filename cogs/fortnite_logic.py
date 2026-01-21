@@ -348,7 +348,7 @@ class Fortnite(commands.Cog):
             return
 
         daily_defs = {}
-        json_path = "../constants/stw_dailies.json" 
+        json_path = "/constants/stw_dailies.json" 
         
         try:
             with open(json_path, "r", encoding="utf-8") as f:
