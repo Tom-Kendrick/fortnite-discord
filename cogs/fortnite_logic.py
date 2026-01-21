@@ -307,7 +307,7 @@ class Fortnite(commands.Cog):
         await status_msg.edit(content=None, embed=embed)
 
     def format_quest_info(self, item_data, daily_defs):
-        template_id = item_data.get("template_id", item_data.get("templateId", ""))
+        template_id = item_data.get("templateId", "")
         attributes = item_data.get("attributes", {})
         
         clean_id = template_id.replace("Quest:", "")
@@ -324,122 +324,77 @@ class Fortnite(commands.Cog):
             
             rewards = info.get("rewards", {})
             reward_str = ""
-            if "mtx" in rewards and rewards["mtx"] > 0:
-                reward_str += f" <:vbucks:> **{rewards['mtx']}**"
-            elif "gold" in rewards:
-                reward_str += f" 🟡 **{rewards['gold']}**"
-                
-            return f"**{quest_name}**\n`{current}/{target}` {reward_str}"
-        else:
-            raw_name = clean_id.replace("daily_", "").replace("_", " ").title()
-            return f"**{raw_name}**\n`Progress: {current}`"
+            vbucks = rewards.get("mtx", 0)
+            gold = rewards.get("gold", 0)
 
-    @commands.hybrid_command(name="dailies", description="Claim and view active STW Daily Quests")
-    @app_commands.describe(name="Account name (leave empty for first account)")
-    async def dailies(self, ctx, *, name: str = None):
+            if vbucks > 0:
+                reward_str = f" <:vbucks:> **{vbucks}**"
+            elif gold > 0:
+                reward_str = f" 🟡 **{gold}**"
+                
+            return f"**{quest_name}**\n`{current}/{target}` {reward_str}", vbucks
+        
+        raw_name = clean_id.replace("daily_", "").replace("_", " ").title()
+        return f"**{raw_name}**\n`Progress: {current}`", 0
+
+    @commands.hybrid_command(name="dailiesbulk", description="Check Daily Quests for ALL accounts")
+    async def dailiesbulk(self, ctx):
         await ctx.defer()
         
+        my_accounts = self.get_user_accounts(ctx.author.id)
+        if not my_accounts:
+            await ctx.send("❌ No accounts found. Use `/login`.")
+            return
+
         daily_defs = {}
         try:
             with open("../constants/stw_dailies.json", "r", encoding="utf-8") as f:
                 daily_defs = json.load(f)
         except Exception as e:
-            print(f"⚠️ Could not load daily definitions: {e}")
+            print(f"⚠️ Load Error: {e}")
 
-        device_auths = self.get_auth_details(ctx.author.id, name)
+        status_msg = await ctx.send(f"🔄 Processing {len(my_accounts)} accounts...")
         
-        if not device_auths:
-            if name:
-                await ctx.send(f"❌ Account `{name}` not found in your list.")
-            else:
-                await ctx.send("❌ You haven't added any accounts yet! Use `/login`.")
-            return
-
-        status_msg = await ctx.send(f"🔄 Checking **{device_auths['account_name']}**...")
+        embed = discord.Embed(title="📜 Bulk Daily Quests Report", color=0x9b59b6)
+        total_vbucks = 0
+        total_quests = 0
 
         async with aiohttp.ClientSession() as session:
-            token_data, error = await self._authenticate(session, device_auths)
-            if error:
-                await status_msg.edit(content=f"❌ Auth failed: `{error}`")
-                return
+            for auth in my_accounts:
+                token_data, error = await self._authenticate(session, auth)
+                if error:
+                    embed.add_field(name=f"👤 {auth['account_name']}", value="❌ Auth Failed", inline=False)
+                    continue
 
-            access_token = token_data['access_token']
-            account_id = token_data['account_id']
-            display_name = token_data.get('displayName', 'Unknown')
+                base_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{token_data['account_id']}/client"
+                headers = {"Authorization": f"Bearer {token_data['access_token']}", "Content-Type": "application/json"}
+                params = {"profileId": "campaign", "rvn": "-1"}
 
-            base_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client"
-            headers = {
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json"
-            }
-            params = {
-                "profileId": "campaign",
-                "rvn": "-1"
-            }
-
-            async with session.post(f"{base_url}/ClientQuestLogin", params=params, json={}, headers=headers) as resp:
-                if resp.status != 200:
-                    print(f"Warning: ClientQuestLogin failed with {resp.status}")
-
-            async with session.post(f"{base_url}/QueryProfile", params=params, json={}, headers=headers) as resp:
-                if resp.status != 200:
-                    err_text = await resp.text()
-                    await status_msg.edit(content=f"❌ Failed to fetch profile: `{resp.status}`\n```{err_text[:100]}```")
-                    return
-                
-                data = await resp.json()
-
-            try:
-                if "profileChanges" in data:
-                    items = data["profileChanges"][0]["profile"]["items"]
-                else:
-                    items = data.get("items", {})
-            except (KeyError, IndexError):
-                items = {}
-
-            active_dailies = []
-
-            for item_id, item_data in items.items():
-                template_id = item_data.get("templateId", "")
-                attributes = item_data.get("attributes", {})
-
-                if template_id.startswith("Quest:daily_") and attributes.get("quest_state") == "Active":
+                try:
+                    await session.post(f"{base_url}/ClientQuestLogin", params=params, json={}, headers=headers)
                     
-                    clean_id = template_id.replace("Quest:", "")
+                    async with session.post(f"{base_url}/QueryProfile", params=params, json={}, headers=headers) as resp:
+                        data = await resp.json()
+
+                    items = data["profileChanges"][0]["profile"]["items"] if "profileChanges" in data else data.get("items", {})
                     
-                    current = 0
-                    for obj in attributes.get("objectives", []):
-                        current = obj.get("completionCount", 0)
-                        break 
-                    
-                    if clean_id in daily_defs:
-                        info = daily_defs[clean_id]
-                        quest_name = info["names"].get("en", clean_id)
-                        target = info.get("limit", "?")
-                        
-                        rewards = info.get("rewards", {})
-                        reward_str = ""
-                        if "mtx" in rewards and rewards["mtx"] > 0:
-                            reward_str += f" <:vbucks:> **{rewards['mtx']}**"
-                        elif "gold" in rewards:
-                            reward_str += f" 🟡 **{rewards['gold']}**"
-                            
-                        entry_str = f"• **{quest_name}**\n   `{current}/{target}` {reward_str}"
-                    else:
-                        raw_name = clean_id.replace("daily_", "").replace("_", " ").title()
-                        entry_str = f"• **{raw_name}**\n   `Progress: {current}`"
+                    account_lines = []
+                    for item_data in items.values():
+                        tid = item_data.get("templateId", "")
+                        if tid.startswith("Quest:daily_") and item_data.get("attributes", {}).get("quest_state") == "Active":
+                            line, v_val = self.format_quest_info(item_data, daily_defs)
+                            account_lines.append(line)
+                            total_vbucks += v_val
+                            total_quests += 1
 
-                    active_dailies.append(entry_str)
+                    val_text = "\n".join(account_lines) if account_lines else "✅ *All quests completed*"
+                    embed.add_field(name=f"👤 {token_data.get('displayName', auth['account_name'])}", value=val_text, inline=False)
 
-            embed = discord.Embed(title=f"📜 Daily Quests: {display_name}", color=discord.Color.purple())
-            
-            if active_dailies:
-                embed.description = "\n".join(active_dailies)
-                embed.set_footer(text=f"Total Active: {len(active_dailies)}/3")
-            else:
-                embed.description = "✅ No active daily quests found (or all completed)."
+                except Exception:
+                    embed.add_field(name=f"👤 {auth['account_name']}", value="⚠️ Error fetching data", inline=False)
 
-            await status_msg.edit(content=None, embed=embed)
+        embed.set_footer(text=f"Total: {total_quests} Quests • {total_vbucks} V-Bucks Pending")
+        await status_msg.edit(content=None, embed=embed)
 
     @commands.hybrid_command(name="dailiesbulk", description="Claim and check Daily Quests for ALL accounts")
     async def dailiesbulk(self, ctx):
