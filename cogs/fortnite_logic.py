@@ -347,14 +347,11 @@ class Fortnite(commands.Cog):
             await ctx.send("❌ You haven't added any accounts yet! Use `/login`.")
             return
 
-        daily_defs = {}
-        json_path = "/constants/stw_dailies.json" 
-        
-        try:
-            with open(json_path, "r", encoding="utf-8") as f:
-                daily_defs = json.load(f)
-        except Exception as e:
-            print(f"⚠️ Error loading {json_path}: {e}")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.join(script_dir, "..", "constants", "stw_dailies.json")
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            daily_defs = json.load(f)
 
         status_msg = await ctx.send(f"🔄 Checking {len(my_accounts)} accounts...")
         
