@@ -338,65 +338,73 @@ class Fortnite(commands.Cog):
         return f"• **{fallback_name}** (Not in JSON)\n   `Progress: {current}`", 0
 
 
-    @commands.hybrid_command(name="dailiesbulk", description="Check Daily Quests for ALL accounts")
+    @commands.hybrid_command(name="dailiesbulk", description="Check Daily Quests for ALL accounts in a grid")
     async def dailiesbulk(self, ctx):
         await ctx.defer()
         
+        import os
         my_accounts = self.get_user_accounts(ctx.author.id)
         if not my_accounts:
-            await ctx.send("❌ You haven't added any accounts yet! Use `/login`.")
+            await ctx.send("❌ No accounts found.")
             return
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        json_path = os.path.join(script_dir, "..", "constants", "stw_dailies.json")
-
-        with open(json_path, "r", encoding="utf-8") as f:
-            daily_defs = json.load(f)
+        daily_defs = {}
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.join(current_dir, "..", "constants", "stw_dailies.json")
+        
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                raw_data = json.load(f)
+                daily_defs = {k.lower(): v for k, v in raw_data.items()}
+        except Exception as e:
+            await ctx.send(f"⚠️ Path Error: Check logs.")
+            print(f"PATH ERROR: {json_path} -> {e}")
+            return
 
         status_msg = await ctx.send(f"🔄 Checking {len(my_accounts)} accounts...")
+        embed = discord.Embed(title="📜 Bulk Daily Quests", color=discord.Color.purple())
         
-        embed = discord.Embed(title="📜 Bulk Daily Quests Report", color=discord.Color.purple())
-        total_vbucks = 0
-        total_quests = 0
+        grand_total_vbucks = 0
+        grand_total_gold = 0
 
         async with aiohttp.ClientSession() as session:
-            for auth_details in my_accounts:
-                token_data, error = await self._authenticate(session, auth_details)
+            for index, auth in enumerate(my_accounts):
+                token_data, error = await self._authenticate(session, auth)
                 if error:
-                    embed.add_field(name=f"👤 {auth_details['account_name']}", value="❌ Auth Failed", inline=False)
-                    continue
-
-                account_id = token_data['account_id']
-                display_name = token_data.get('displayName', auth_details['account_name'])
-
-                base_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client"
-                headers = {"Authorization": f"Bearer {token_data['access_token']}", "Content-Type": "application/json"}
-                params = {"profileId": "campaign", "rvn": "-1"}
-
-                try:
-                    await session.post(f"{base_url}/ClientQuestLogin", params=params, json={}, headers=headers)
+                    embed.add_field(name=f"👤 {auth['account_name']}", value="❌ Auth Failed", inline=True)
+                else:
+                    account_id = token_data['account_id']
+                    display_name = token_data.get('displayName', auth['account_name'])
+                    base_url = f"https://fortnite-public-service-prod11.ol.epicgames.com/fortnite/api/game/v2/profile/{account_id}/client"
+                    headers = {"Authorization": f"Bearer {token_data['access_token']}", "Content-Type": "application/json"}
                     
-                    async with session.post(f"{base_url}/QueryProfile", params=params, json={}, headers=headers) as resp:
-                        data = await resp.json()
+                    try:
+                        await session.post(f"{base_url}/ClientQuestLogin", params={"profileId": "campaign", "rvn": "-1"}, json={}, headers=headers)
+                        async with session.post(f"{base_url}/QueryProfile", params={"profileId": "campaign", "rvn": "-1"}, json={}, headers=headers) as resp:
+                            data = await resp.json()
+                        
+                        items = data["profileChanges"][0]["profile"]["items"] if "profileChanges" in data else data.get("items", {})
+                        
+                        quest_lines = []
+                        for item_data in items.values():
+                            tid = item_data.get("templateId", "").lower()
+                            if tid.startswith("quest:daily_") and item_data.get("attributes", {}).get("quest_state") == "Active":
+                                text, v_val = self.format_quest_info(item_data, daily_defs)
+                                quest_lines.append(text)
+                                grand_total_vbucks += v_val
+                                clean_id = tid.replace("quest:", "")
+                                grand_total_gold += daily_defs.get(clean_id, {}).get("rewards", {}).get("gold", 0)
 
-                    items = data["profileChanges"][0]["profile"]["items"] if "profileChanges" in data else data.get("items", {})
-                    
-                    quest_lines = []
-                    for item_data in items.values():
-                        tid = item_data.get("templateId", "")
-                        if tid.lower().startswith("quest:daily_") and item_data.get("attributes", {}).get("quest_state") == "Active":
-                            quest_text, v_val = self.format_quest_info(item_data, daily_defs)
-                            quest_lines.append(quest_text)
-                            total_vbucks += v_val
-                            total_quests += 1
+                        val_text = "\n".join(quest_lines) if quest_lines else "✅ *All Done*"
+                        embed.add_field(name=f"👤 {display_name}", value=val_text, inline=True)
 
-                    val_text = "\n".join(quest_lines) if quest_lines else "✅ *All quests completed*"
-                    embed.add_field(name=f"👤 {display_name}", value=val_text, inline=False)
+                    except Exception:
+                        embed.add_field(name=f"👤 {display_name}", value="⚠️ API Error", inline=True)
 
-                except Exception as e:
-                    embed.add_field(name=f"👤 {display_name}", value=f"⚠️ Error: {str(e)[:50]}", inline=False)
+                if (index + 1) % 2 == 0:
+                    embed.add_field(name="\u200b", value="\u200b", inline=True)
 
-        embed.set_footer(text=f"Total: {total_quests} Quests • {total_vbucks} V-Bucks Pending")
+        embed.set_footer(text=f"💰 Total: {grand_total_vbucks} V-Bucks • 🟡 {grand_total_gold} Gold")
         await status_msg.edit(content=None, embed=embed)
         
     @commands.hybrid_command(name="locker", description="Generate a Fortnite.GG locker link")
